@@ -1,4 +1,5 @@
 #include <conio.h>
+#include <stdlib.h>
 #include <mem.h>
 
 #include "esfm.h"
@@ -72,10 +73,15 @@ void fm_noteoff(int chan)
 
 void fm_init(void)
 {
+	unsigned char status;
+	
 	// Reset to OPL3 mode
 	outp(FMBASE, 0x01);
 	// Switch to ESFM mode
 	fm_write(0x105, 0x80);
+	// Verify
+	status = fm_read(0x505);
+	if (!(status & 0x80)) abort();
 }
 
 void fm_setop(int chan, int op, ESFM_Operator *params)
@@ -91,7 +97,7 @@ void fm_setop(int chan, int op, ESFM_Operator *params)
 	fm_write(regbase + 7, (params->out_level << 5) | (params->noise << 3) | params->wave);
 }
 
-void fm_playchan(ESFM_Channel *chan, char octave, char note) {
+void fm_playchan(ESFM_Channel *chan, int octave, int note) {
 	int op;
 	int fblock, fmult, fnum;
 
@@ -139,25 +145,23 @@ const char * fm_regname(int regnum, int *maxval)
 	if (!maxval) maxval = &dummy;
 
 	switch (regnum) {
-	case 0: *maxval = 1; return "KSR ";
-	case 1: *maxval = 1; return "EGT ";
-	case 2: *maxval = 1; return "VIB ";
-	case 3: *maxval = 1; return "VIBD";
-	case 4: *maxval = 1; return "TRM ";
-	case 5: *maxval = 1; return "TRMD";
-	case 6: *maxval = 1; return "OUTL";
-	case 7: *maxval = 1; return "OUTR";
-	case 8: *maxval = 7; return "OUT ";
-	case 9: *maxval = 7; return "MOD ";
-	case 10: *maxval = 63; return "ATTN";
-	case 11: *maxval = 15; return "ATK ";
-	case 12: *maxval = 15; return "DEC ";
-	case 13: *maxval = 15; return "SUS ";
-	case 14: *maxval = 15; return "REL ";
-	case 15: *maxval = 7; return "DELY";
-	case 16: *maxval = 3; return "KSL ";
-	case 17: *maxval = 7; return "WAVE";
-	case 18: *maxval = 3; return "NOIS";
+	case 0: *maxval = 7; return "OUT ";
+	case 1: *maxval = 1; return "OUTL";
+	case 2: *maxval = 1; return "OUTR";
+	case 3: *maxval = 7; return "MOD ";
+	case 4: *maxval = 63; return "ATTN";
+	case 5: *maxval = 1; return "EGT ";
+	case 6: *maxval = 15; return "ATK ";
+	case 7: *maxval = 15; return "DEC ";
+	case 8: *maxval = 15; return "SUS ";
+	case 9: *maxval = 15; return "REL ";
+	case 10: *maxval = 1; return "KSR ";
+	case 11: *maxval = 7; return "DELY";
+	case 12: *maxval = 3; return "KSL ";
+	case 13: *maxval = 2; return "VIB ";
+	case 14: *maxval = 2; return "TRM ";
+	case 15: *maxval = 3; return "NOIS";
+	case 16: *maxval = 7; return "WAVE";
 	default:
 		return NULL;
 	}
@@ -166,25 +170,23 @@ const char * fm_regname(int regnum, int *maxval)
 int fm_getreg(ESFM_Operator *op, int regnum)
 {
 	switch (regnum) {
-	case 0: return op->ksr;
-	case 1: return op->egt;
-	case 2: return op->vib;
-	case 3: return op->vibd;
-	case 4: return op->trm;
-	case 5: return op->trmd;
-	case 6: return op->out_left;
-	case 7: return op->out_right;
-	case 8: return op->out_level;
-	case 9: return op->mod_level;
-	case 10: return op->attenuation;
-	case 11: return op->attack;
-	case 12: return op->decay;
-	case 13: return op->sustain;
-	case 14: return op->release;
-	case 15: return op->delay;
-	case 16: return op->ksl;
-	case 17: return op->wave;
-	case 18: return op->noise;
+	case 0: return op->out_level;
+	case 1: return op->out_left;
+	case 2: return op->out_right;
+	case 3: return op->mod_level;
+	case 4: return op->attenuation;
+	case 5: return op->egt;
+	case 6: return op->attack;
+	case 7: return op->decay;
+	case 8: return op->sustain;
+	case 9: return op->release;
+	case 10: return op->ksr;
+	case 11: return op->delay;
+	case 12: return op->ksl;
+	case 13: return op->vib ? (1 + op->vibd) : 0;
+	case 14: return op->trm ? (1 + op->trmd) : 0;
+	case 15: return op->noise;
+	case 16: return op->wave;
 	default: return -1;
 	}
 }
@@ -192,25 +194,23 @@ int fm_getreg(ESFM_Operator *op, int regnum)
 void fm_setreg(ESFM_Operator *op, int regnum, int val)
 {
 	switch (regnum) {
-	case 0: op->ksr = val; break;
-	case 1: op->egt = val; break;
-	case 2: op->vib = val; break;
-	case 3: op->vibd = val; break;
-	case 4: op->trm = val; break;
-	case 5: op->trmd = val; break;
-	case 6: op->out_left = val; break;
-	case 7: op->out_right = val; break;
-	case 8: op->out_level = val; break;
-	case 9: op->mod_level = val; break;
-	case 10: op->attenuation = val; break;
-	case 11: op->attack = val; break;
-	case 12: op->decay = val; break;
-	case 13: op->sustain = val; break;
-	case 14: op->release = val; break;
-	case 15: op->delay = val; break;
-	case 16: op->ksl = val; break;
-	case 17: op->wave = val; break;
-	case 18: op->noise = val; break;
+	case 0: op->out_level = val; break;
+	case 1: op->out_left = val; break;
+	case 2: op->out_right = val; break;
+	case 3: op->mod_level = val; break;
+	case 4: op->attenuation = val; break;
+	case 5: op->egt = val; break;
+	case 6: op->attack = val; break;
+	case 7: op->decay = val; break;
+	case 8: op->sustain = val; break;
+	case 9: op->release = val; break;
+	case 10: op->ksr = val; break;
+	case 11: op->delay = val; break;
+	case 12: op->ksl = val; break;
+	case 13: op->vib = val ? 1 : 0; op->vibd = val == 2; break;
+	case 14: op->trm = val ? 1 : 0; op->trmd = val == 2; break;
+	case 15: op->noise = val; break;
+	case 16: op->wave = val; break;
 	}
 }
 

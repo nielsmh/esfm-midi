@@ -1,0 +1,24 @@
+!define BLANK ""
+C:\esfm\ESFM.obj : C:\esfm\ESFM.C .AUTODEPEND
+ @C:
+ cd C:\esfm
+ *wcc ESFM.C -i="C:\WATCOM/h" -w4 -e25 -zq -od -d2 -bt=dos -fo=.obj -ml
+
+C:\esfm\ESFMLIB.obj : C:\esfm\ESFMLIB.C .AUTODEPEND
+ @C:
+ cd C:\esfm
+ *wcc ESFMLIB.C -i="C:\WATCOM/h" -w4 -e25 -zq -od -d2 -bt=dos -fo=.obj -ml
+
+C:\esfm\tui.obj : C:\esfm\tui.c .AUTODEPEND
+ @C:
+ cd C:\esfm
+ *wcc tui.c -i="C:\WATCOM/h" -w4 -e25 -zq -od -d2 -bt=dos -fo=.obj -ml
+
+C:\esfm\esfm.exe : C:\esfm\ESFM.obj C:\esfm\ESFMLIB.obj C:\esfm\tui.obj C:\e&
+sfm\Esfm.h C:\esfm\ui.h .AUTODEPEND
+ @C:
+ cd C:\esfm
+ @%write esfm.lk1 FIL ESFM.obj,ESFMLIB.obj,tui.obj
+ @%append esfm.lk1 
+ *wlink name esfm d all sys dos op m op maxe=25 op q op symf @esfm.lk1
+

@@ -66,7 +66,7 @@ void fm_noteon(int chan);
 /** Clear the note on flag for an ESFM channel */
 void fm_noteoff(int chan);
 /** Start playing a note on an ESFM channel, setting the frequency parameters */
-void fm_playchan(ESFM_Channel *chan, char octave, char note);
+void fm_playchan(ESFM_Channel *chan, int octave, int note);
 
 /** Get the name and maximum value for an ESFM operator register */
 const char * fm_regname(int regnum, int *maxval);

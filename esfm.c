@@ -4,11 +4,16 @@
 #include <conio.h>
 #include <bios.h>
 #include <mem.h>
+#include <graph.h>
 
 #include "esfm.h"
+#include "ui.h"
+
+/* the channels on the synth */
+ESFM_Channel all_channels[16];
 
 /* channel we're playing on */
-static ESFM_Channel channel;
+ESFM_Channel *cur_channel = &all_channels[0];
 
 /* current input and run state */
 static int run = 1;
@@ -25,8 +30,8 @@ void print_status_line(void)
 	char regvalstr[8];
 	int regval, regvalmax;
 
-	if (channel.playing) {
-		sprintf(playstatus, "%d-%d", channel.octave, channel.note);
+	if (cur_channel->playing) {
+		sprintf(playstatus, "%d-%d", cur_channel->octave, cur_channel->note);
 	} else {
 		sprintf(playstatus, " - ");
 	}
@@ -35,12 +40,12 @@ void print_status_line(void)
 	case 0:
 		editmodestr = "Param";
 		editregnamestr = fm_regname(editregnum, &regvalmax);
-		regval = fm_getreg(&channel.op[editop], editregnum);
+		regval = fm_getreg(&cur_channel->op[editop], editregnum);
 		break;
 	case 1:
 		editmodestr = "FRule";
 		editregnamestr = fm_frulename(editregnum, NULL, &regvalmax);
-		regval = fm_getfrule(&channel.frule[editop], editregnum);
+		regval = fm_getfrule(&cur_channel->frule[editop], editregnum);
 		break;
 	default:
 		editmodestr = "?what?";
@@ -73,19 +78,19 @@ void regedit_change(int delta)
 	switch (editmode) {
 	case 0:
 		fm_regname(editregnum, &maxval);
-		curval = fm_getreg(&channel.op[editop], editregnum);
+		curval = fm_getreg(&cur_channel->op[editop], editregnum);
 		curval += delta;
 		if (curval < minval) curval = minval;
 		if (curval > maxval) curval = maxval;
-		fm_setreg(&channel.op[editop], editregnum, curval);
+		fm_setreg(&cur_channel->op[editop], editregnum, curval);
 		break;
 	case 1:
 		fm_frulename(editregnum, &minval, &maxval);
-		curval = fm_getfrule(&channel.frule[editop], editregnum);
+		curval = fm_getfrule(&cur_channel->frule[editop], editregnum);
 		curval += delta;
 		if (curval < minval) curval = minval;
 		if (curval > maxval) curval = maxval;
-		fm_setfrule(&channel.frule[editop], editregnum, curval);
+		fm_setfrule(&cur_channel->frule[editop], editregnum, curval);
 		break;
 	}
 }
@@ -106,157 +111,96 @@ void help(void)
 int main()
 {
 	// input
+	UI_Input ui_input;
 	unsigned short keypress;
 	int note = 1;
 	int octave = 3;
 
-	memset(&channel, 0, sizeof(channel));
+	if (!ui_init()) return 1;
+
+	memset(all_channels, 0, sizeof(all_channels));
 
 	// Basic simple frequency rule
-	channel.frule[0].use_note = 1;
-	channel.frule[1].use_note = 1;
-	channel.frule[2].use_note = 1;
-	channel.frule[3].use_note = 1;
+	cur_channel->frule[0].use_note = 1;
+	cur_channel->frule[1].use_note = 1;
+	cur_channel->frule[2].use_note = 1;
+	cur_channel->frule[3].use_note = 1;
 
 	// Envelope
-	channel.op[0].egt = 1;
-	channel.op[0].attack = 7;
-	channel.op[0].decay = 3;
-	channel.op[0].sustain = 4;
-	channel.op[0].release = 5;
-	channel.op[0].delay = 0;
+	cur_channel->op[0].egt = 1;
+	cur_channel->op[0].attack = 7;
+	cur_channel->op[0].decay = 3;
+	cur_channel->op[0].sustain = 4;
+	cur_channel->op[0].release = 5;
+	cur_channel->op[0].delay = 0;
 	// Tone
-	channel.op[0].wave = 1;
-	channel.op[0].noise = 0;
-	channel.op[0].ksr = 0;
-	channel.op[0].vib = 0;
-	channel.op[0].trm = 0;
-	channel.op[0].ksl = 0;
-	channel.op[0].vibd = 0;
-	channel.op[0].trmd = 0;
+	cur_channel->op[0].wave = 1;
+	cur_channel->op[0].noise = 0;
+	cur_channel->op[0].ksr = 0;
+	cur_channel->op[0].vib = 0;
+	cur_channel->op[0].trm = 0;
+	cur_channel->op[0].ksl = 0;
+	cur_channel->op[0].vibd = 0;
+	cur_channel->op[0].trmd = 0;
 	// Levels
-	channel.op[0].attenuation = 0;
-	channel.op[0].mod_level = 0;
-	channel.op[0].out_left = 1;
-	channel.op[0].out_right = 1;
-	channel.op[0].out_level = 7;
+	cur_channel->op[0].attenuation = 0;
+	cur_channel->op[0].mod_level = 0;
+	cur_channel->op[0].out_left = 1;
+	cur_channel->op[0].out_right = 1;
+	cur_channel->op[0].out_level = 7;
 
-	printf("Setting up synth...\n");
 	fm_init();
-	help();
-	print_status_line();
 
 	while (run) {
-		keypress = _bios_keybrd(_NKEYBRD_READ);
-		//printf("<%04x>", keypress);
-		note = 0;
-		switch (keypress >> 8) {
-			// Q2W3E
-			case 0x10: note =  1; octave = 2; break;
-			case 0x03: note =  2; octave = 2; break;
-			case 0x11: note =  3; octave = 2; break;
-			case 0x04: note =  4; octave = 2; break;
-			case 0x12: note =  5; octave = 2; break;
-			// R5T6Y7U
-			case 0x13: note =  6; octave = 2; break;
-			case 0x06: note =  7; octave = 2; break;
-			case 0x14: note =  8; octave = 2; break;
-			case 0x07: note =  9; octave = 2; break;
-			case 0x15: note = 10; octave = 2; break;
-			case 0x08: note = 11; octave = 2; break;
-			case 0x16: note = 12; octave = 2; break;
-			// I9O0P
-			case 0x17: note =  1; octave = 3; break;
-			case 0x0A: note =  2; octave = 3; break;
-			case 0x18: note =  3; octave = 3; break;
-			case 0x0B: note =  4; octave = 3; break;
-			case 0x19: note =  5; octave = 3; break;
-			// ZSXDCFV
-			case 0x2C: note =  6; octave = 3; break;
-			case 0x1F: note =  7; octave = 3; break;
-			case 0x2D: note =  8; octave = 3; break;
-			case 0x20: note =  9; octave = 3; break;
-			case 0x2E: note = 10; octave = 3; break;
-			case 0x21: note = 11; octave = 3; break;
-			case 0x2F: note = 12; octave = 3; break;
-			// BHNJM
-			case 0x30: note =  1; octave = 4; break;
-			case 0x23: note =  2; octave = 4; break;
-			case 0x31: note =  3; octave = 4; break;
-			case 0x24: note =  4; octave = 4; break;
-			case 0x32: note =  5; octave = 4; break;
-			// space (stop playing)
-			case 0x39: note = -1; break;
-			// escape (quit)
-			case 0x01: run = 0; note = -1; break;
-			// F1-F4 (select operator to edit)
-			case 0x3B: case 0x3C: case 0x3D: case 0x3E:
-				editop = (keypress >> 8) - 0x3B;
-				note = 0;
-				break;
-			// F5-F8 (select parameter to edit)
-			case 0x3F: case 0x40:
-				if (editmode != 0) {
-					editmode = 0;
-					editregnum = 0;
-				} else if ((keypress >> 8) == 0x3F) {
-					editregnum -= 1;
-					if (editregnum < 0) editregnum = 18;
-				} else {
-					editregnum += 1;
-					if (editregnum > 18) editregnum = 0;
-				}
-				note = 0;
-				break;
-			case 0x41: case 0x42:
-				if (editmode != 1) {
-					editmode = 1;
-					editregnum = 0;
-				} else if ((keypress >> 8) == 0x41) {
-					editregnum -= 1;
-					if (editregnum < 0) editregnum = 3;
-				} else {
-					editregnum += 1;
-					if (editregnum > 3) editregnum = 0;
-				}
-				note = 0;
-				break;
-			// F9-F10 (edit parameter)
-			case 0x43:
-				regedit_change(-1);
-				note = -3;
-				break;
-			case 0x44:
-				regedit_change(+1);
-				note = -3;
-				break;
+		if (ui_handleinput(&ui_input)) {
+			switch (ui_input.command) {
+				case UICMD_QUIT:
+					fm_noteoff(cur_channel->channel);
+					run = 0;
+					break;
+				case UICMD_NOTEON:
+					fm_playchan(cur_channel, ui_input.parm2, ui_input.parm1);
+					break;
+				case UICMD_ALL_NOTES_OFF:
+				case UICMD_NOTEOFF:
+					fm_noteoff(cur_channel->channel);
+					cur_channel->playing = 0;
+					break;
+				case UICMD_PARMCHANGE:
+					fm_setop(cur_channel->channel, ui_input.parm1, &cur_channel->op[editop]);
+					break;
+			}
 		}
 
+	/*
+		keypress = _bios_keybrd(_NKEYBRD_READ);
+		printf("<%04x>", keypress); fflush(stdout);
+		note = 0;
+
 		if (note > 0) {
-			fm_playchan(&channel, octave, note);
+			fm_playchan(cur_channel, octave, note);
 		}
 		if (note == -1) {
 			// sound off
-			fm_noteoff(channel.channel);
-			channel.playing = 0;
+			fm_noteoff(cur_channel->channel);
+			cur_channel->playing = 0;
 		}
-		if (note == -2 && channel.playing) {
+		if (note == -2 && cur_channel->playing) {
 			// sound off after changing parameter
-			fm_noteoff(channel.channel);
-			channel.playing = 0;
+			fm_noteoff(cur_channel->channel);
+			cur_channel->playing = 0;
 		}
 		if (note == -3) {
 			// parameter change, update
-			fm_setop(channel.channel, editop, &channel.op[editop]);
+			fm_setop(cur_channel->channel, editop, &cur_channel->op[editop]);
 		}
 		if (note == -255) {
 			// ignore?
 		}
-
-		print_status_line();
+	*/
 	}
 
-	puts("\nGoodbye\n");
+	ui_finalize();
 
 	return 0;
 }
