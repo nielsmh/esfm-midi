@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <dos.h>
+#include <conio.h>
 #include <bios.h>
 #include <mem.h>
 
@@ -63,6 +64,7 @@ void print_status_line(void)
 		editregnamestr,
 		regvalstr
 		);
+	fflush(stdout);
 }
 
 void regedit_change(int delta)
@@ -84,7 +86,7 @@ void regedit_change(int delta)
 		if (curval < minval) curval = minval;
 		if (curval > maxval) curval = maxval;
 		fm_setfrule(&channel.frule[editop], editregnum, curval);
-      break;
+		break;
 	}
 }
 
@@ -104,6 +106,7 @@ void help(void)
 int main()
 {
 	// input
+	unsigned short keypress;
 	int note = 1;
 	int octave = 3;
 
@@ -144,10 +147,10 @@ int main()
 	print_status_line();
 
 	while (run) {
-		while (bioskey(1) == 0);
-		note = bioskey(0);
-		//printf("<%04x>", note);
-		switch (note >> 8) {
+		keypress = _bios_keybrd(_NKEYBRD_READ);
+		//printf("<%04x>", keypress);
+		note = 0;
+		switch (keypress >> 8) {
 			// Q2W3E
 			case 0x10: note =  1; octave = 2; break;
 			case 0x03: note =  2; octave = 2; break;
@@ -188,7 +191,7 @@ int main()
 			case 0x01: run = 0; note = -1; break;
 			// F1-F4 (select operator to edit)
 			case 0x3B: case 0x3C: case 0x3D: case 0x3E:
-				editop = (note >> 8) - 0x3B;
+				editop = (keypress >> 8) - 0x3B;
 				note = 0;
 				break;
 			// F5-F8 (select parameter to edit)
@@ -196,7 +199,7 @@ int main()
 				if (editmode != 0) {
 					editmode = 0;
 					editregnum = 0;
-				} else if ((note >> 8) == 0x3F) {
+				} else if ((keypress >> 8) == 0x3F) {
 					editregnum -= 1;
 					if (editregnum < 0) editregnum = 18;
 				} else {
@@ -209,7 +212,7 @@ int main()
 				if (editmode != 1) {
 					editmode = 1;
 					editregnum = 0;
-				} else if ((note >> 8) == 0x41) {
+				} else if ((keypress >> 8) == 0x41) {
 					editregnum -= 1;
 					if (editregnum < 0) editregnum = 3;
 				} else {
@@ -227,7 +230,6 @@ int main()
 				regedit_change(+1);
 				note = -3;
 				break;
-			default:  note = -255; break;
 		}
 
 		if (note > 0) {

@@ -1,4 +1,4 @@
-#include <dos.h>
+#include <conio.h>
 #include <mem.h>
 
 #include "esfm.h"
@@ -46,18 +46,18 @@ unsigned int fm_regbase(int chan, int op)
 
 void fm_write(unsigned int reg, unsigned char d)
 {
-	outportb(FMBASE + 2, reg & 0xFF);
-	outportb(FMBASE + 3, reg >> 8);
-	(void)inportb(FMBASE); /* delay */
-	outportb(FMBASE + 1, d);
+	outp(FMBASE + 2, reg & 0xFF);
+	outp(FMBASE + 3, reg >> 8);
+	(void)inp(FMBASE); /* delay */
+	outp(FMBASE + 1, d);
 }
 
 unsigned char fm_read(unsigned int reg)
 {
-	outportb(FMBASE + 2, reg & 0xFF);
-	outportb(FMBASE + 3, reg >> 8);
-	(void)inportb(FMBASE); /* delay */
-	return inportb(FMBASE + 1);
+	outp(FMBASE + 2, reg & 0xFF);
+	outp(FMBASE + 3, reg >> 8);
+	(void)inp(FMBASE); /* delay */
+	return inp(FMBASE + 1);
 }
 
 void fm_noteon(int chan)
@@ -72,7 +72,9 @@ void fm_noteoff(int chan)
 
 void fm_init(void)
 {
-	outportb(FMBASE, 0x01);
+	// Reset to OPL3 mode
+	outp(FMBASE, 0x01);
+	// Switch to ESFM mode
 	fm_write(0x105, 0x80);
 }
 
