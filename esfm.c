@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <dos.h>
+#include <bios.h>
+#include <mem.h>
 
 #include "esfm.h"
 
@@ -27,7 +29,7 @@ unsigned FNUM_BASE[14] = {
 	690, // C
 };
 
-unsigned FBLOCK_FMULT_OCTAVE[2][9] = {
+unsigned FBLOCK_FMULT_OCTAVE[9][2] = {
 	{ 1, 1 },
 	{ 2, 1 },
 	{ 2, 2 },
@@ -89,52 +91,159 @@ void fm_setop(int chan, int op, ESFM_Operator *params)
 	fm_write(regbase + 7, (params->out_level << 5) | (params->noise << 3) | params->wave);
 }
 
-int main()
-{
-	int chan = 0;
-	int op = 0;
-	ESFM_Operator opdata = {0};
+void fm_playchan(ESFM_Channel *chan, char octave, char note) {
+	int op;
+	int fblock, fmult, fnum;
 
-	// Frequency: 200 Hz
-	opdata.fmult = 4;
-	opdata.fnum = 522;
-	opdata.fblock = 3;
-
-	// Envelope
-	opdata.egt = 1;
-	opdata.attack = 7;
-	opdata.decay = 1;
-	opdata.sustain = 3;
-	opdata.release = 5;
-	opdata.delay = 0;
-	// Tone
-	opdata.wave = 1;
-	opdata.noise = 0;
-	opdata.ksr = 0;
-	opdata.vib = 0;
-	opdata.trm = 0;
-	opdata.ksl = 0;
-	opdata.vibd = 0;
-	opdata.trmd = 0;
-	// Levels
-	opdata.attenuation = 0;
-	opdata.mod_level = 0;
-	opdata.out_left = 1;
-	opdata.out_right = 1;
-	opdata.out_level = 7;
-
-	printf("Hello world (%u)\n", sizeof(opdata));
-	fm_init();
-
-	for (op = 0; op < 1; ++op) {
-		fm_setop(chan, op, &opdata);
+	// stop playing
+	if (chan->playing) {
+		fm_noteoff(chan->channel);
+		//delay(2);
+		chan->playing = 0;
 	}
 
-	fm_noteon(chan);
-	delay(1200);
-	fm_noteoff(chan);
+	// prepare note
+	chan->octave = octave;
+	chan->note = note;
+	for (op = 0; op < 4; ++op) {
+		if (chan->frule[op].use_note) {
+			fblock = FBLOCK_FMULT_OCTAVE[octave][0] + chan->frule[op].dfblock;
+			fmult = FBLOCK_FMULT_OCTAVE[octave][1] + chan->frule[op].dfmult;
+			fnum = FNUM_BASE[note] + chan->frule[op].dfnum;
+		} else {
+			fblock = chan->frule[op].dfblock;
+			fmult = chan->frule[op].dfmult;
+			fnum = chan->frule[op].dfnum;
+		}
+		if (fblock < 0) fblock = 0;
+		if (fblock > 7) fblock = 7;
+		if (fmult < 0) fmult = 0;
+		if (fmult > 15) fmult = 15;
+		if (fnum < 0) fnum = 0;
+		if (fnum > 1023) fnum = 1023;
+		chan->op[op].fblock = fblock;
+		chan->op[op].fmult = fmult;
+		chan->op[op].fnum = fnum;
+		fm_setop(chan->channel, op, &chan->op[op]);
+	}
 
-	puts("Goodbye world\n");
+	// play!
+	fm_noteon(chan->channel);
+	chan->playing = 1;
+}
+
+int main()
+{
+	int note, lastnote = -1;
+	int octave = 3;
+	int run = 1;
+	ESFM_Channel channel;
+
+	memset(&channel, 0, sizeof(channel));
+
+	channel.frule[0].use_note = 1;
+	channel.frule[1].use_note = 1;
+	channel.frule[2].use_note = 1;
+	channel.frule[3].use_note = 1;
+
+	// Envelope
+	channel.op[0].egt = 1;
+	channel.op[0].attack = 7;
+	channel.op[0].decay = 3;
+	channel.op[0].sustain = 4;
+	channel.op[0].release = 5;
+	channel.op[0].delay = 0;
+	// Tone
+	channel.op[0].wave = 1;
+	channel.op[0].noise = 0;
+	channel.op[0].ksr = 0;
+	channel.op[0].vib = 0;
+	channel.op[0].trm = 0;
+	channel.op[0].ksl = 0;
+	channel.op[0].vibd = 0;
+	channel.op[0].trmd = 0;
+	// Levels
+	channel.op[0].attenuation = 0;
+	channel.op[0].mod_level = 0;
+	channel.op[0].out_left = 1;
+	channel.op[0].out_right = 1;
+	channel.op[0].out_level = 7;
+
+	printf("Hello world (%u)\n", sizeof(channel));
+	fm_init();
+
+	while (run) {
+		while (bioskey(1) == 0);
+		note = bioskey(0);
+		//printf("<%04x>", note);
+		switch (note >> 8) {
+			// Q2W3E
+			case 0x10: note =  1; octave = 2; break;
+			case 0x03: note =  2; octave = 2; break;
+			case 0x11: note =  3; octave = 2; break;
+			case 0x04: note =  4; octave = 2; break;
+			case 0x12: note =  5; octave = 2; break;
+			// R5T6Y7U
+			case 0x13: note =  6; octave = 2; break;
+			case 0x06: note =  7; octave = 2; break;
+			case 0x14: note =  8; octave = 2; break;
+			case 0x07: note =  9; octave = 2; break;
+			case 0x15: note = 10; octave = 2; break;
+			case 0x08: note = 11; octave = 2; break;
+			case 0x16: note = 12; octave = 2; break;
+			// I9O0P
+			case 0x17: note =  1; octave = 3; break;
+			case 0x0A: note =  2; octave = 3; break;
+			case 0x18: note =  3; octave = 3; break;
+			case 0x0B: note =  4; octave = 3; break;
+			case 0x19: note =  5; octave = 3; break;
+			// ZSXDCFV
+			case 0x2C: note =  6; octave = 3; break;
+			case 0x1F: note =  7; octave = 3; break;
+			case 0x2D: note =  8; octave = 3; break;
+			case 0x20: note =  9; octave = 3; break;
+			case 0x2E: note = 10; octave = 3; break;
+			case 0x21: note = 11; octave = 3; break;
+			case 0x2F: note = 12; octave = 3; break;
+			// BHNJM
+			case 0x30: note =  1; octave = 4; break;
+			case 0x23: note =  2; octave = 4; break;
+			case 0x31: note =  3; octave = 4; break;
+			case 0x24: note =  4; octave = 4; break;
+			case 0x32: note =  5; octave = 4; break;
+			// space
+			case 0x39: note = -1; break;
+			// escape
+			case 0x01: run = 0; note = -1; break;
+			// F1-F8
+			case 0x3B: case 0x3C: case 0x3D: case 0x3E:
+			case 0x3F: case 0x40: case 0x41: case 0x42:
+				channel.op[0].wave = (unsigned)((note >> 8) - 0x3B) & 7;
+				printf("wvf=%d,", channel.op[0].wave);
+				note = -2;
+				break;
+			default:  note = -255; break;
+		}
+
+		if (note > 0) {
+			printf("%01d-%01x,", octave, note);
+			fm_playchan(&channel, octave, note);
+		}
+		if (note == -1) {
+			// sound off
+			printf("*,");
+			fm_noteoff(channel.channel);
+		}
+		if (note == -2 && lastnote > 0) {
+			// sound off after changing parameter
+			fm_noteoff(channel.channel);
+		}
+		if (note == -255) {
+			// ignore?
+		}
+	}
+
+	puts("*\nGoodbye world\n");
 
 	return 0;
 }

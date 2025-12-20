@@ -27,4 +27,35 @@ typedef struct {
 	unsigned out_level : 3;
 } ESFM_Operator;
 
+typedef struct {
+	int use_note : 1;
+	int dfblock : 7;
+	int dfmult : 8;
+	int dfnum;
+} ESFM_OpFreqRule;
+
+typedef struct {
+	ESFM_Operator op[4];
+	ESFM_OpFreqRule frule[4];
+	char channel;
+	char playing;
+	char octave;
+	char note;
+} ESFM_Channel;
+
+extern int FMBASE;
+
+extern unsigned FNUM_BASE[14];
+extern unsigned FBLOCK_FMULT_OCTAVE[9][2];
+
+void fm_init(void);
+unsigned int fm_regbase(int chan, int op);
+unsigned char fm_read(unsigned int reg);
+void fm_write(unsigned int reg, unsigned char d);
+void fm_setop(int chan, int op, ESFM_Operator *params);
+void fm_noteon(int chan);
+void fm_noteoff(int chan);
+void fm_playchan(ESFM_Channel *chan, char octave, char note);
+
+
 #endif
