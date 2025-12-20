@@ -8,6 +8,7 @@
 
 #include "esfm.h"
 #include "ui.h"
+#include "helptext.h"
 
 extern ESFM_Channel *cur_channel;
 
@@ -17,6 +18,7 @@ enum UI_SelectionRow {
 	UI_SR_Op2,
 	UI_SR_Op3,
 	UI_SR_Op4,
+	UI_SR_ChanMenu,
 	UI_SR_LAST // sentinel to count
 };
 
@@ -30,7 +32,7 @@ enum UI_OpFields {
 	UI_OF_EnvMode,
 	UI_OF_EnvAtk,
 	UI_OF_EnvDec,
-	UI_OF_Env_Sus,
+	UI_OF_EnvSus,
 	UI_OF_EnvRel,
 	UI_OF_EnvScale,
 	UI_OF_SoundWave,
@@ -55,6 +57,7 @@ enum UI_Colorset {
 static struct {
 	enum UI_SelectionRow row;
 	enum UI_OpFields op_field;
+	int chan_menu_item;
 } current_selection;
 
 static void setcolors(enum UI_Colorset c)
@@ -85,19 +88,93 @@ static void setcolors(enum UI_Colorset c)
 
 static void draw_help(int full)
 {
-	_settextwindow(40, 4, 49, 76);
+	static int last_help_index = -1;
+	int help_index = -1;
+	
 	setcolors(UI_C_HelpBox);
 	
 	if (full) {
+		_settextwindow(40, 4, 49, 76);
 		_clearscreen(_GWINDOW);
-		_outtext("help!");
-	} else {
+		_settextwindow(47, 6, 48, 74);
+		_outtext("Arrow keys move selected field. PgUp/PgDown change values. Esc quits.\n");
+		_outtext("The main letter and number keys play notes. Spacebar stops playing.");
+	}
+
+	switch (current_selection.row) {
+		case UI_SR_Channel: help_index = UIH_Channel; break;
+		case UI_SR_Op1:
+		case UI_SR_Op2:
+		case UI_SR_Op3:
+		case UI_SR_Op4:
+			switch (current_selection.op_field) {
+				case UI_OF_OutL:
+				case UI_OF_OutR:
+					help_index = UIH_OP_LeftRight;
+					break;
+				case UI_OF_OutLevel: help_index = UIH_OP_OutLevel; break;
+				case UI_OF_OutAttenuation: help_index = UIH_OP_Attenuation; break;
+				case UI_OF_Scale: help_index = UIH_OP_Scale; break;
+				case UI_OF_ModLevel:
+					help_index = (current_selection.row == UI_SR_Op1) ? UIH_OP_FeedbackLevel : UIH_OP_ModLevel;
+					break;
+				case UI_OF_EnvMode: help_index = UIH_OP_EnvMode; break;
+				case UI_OF_EnvAtk: help_index = UIH_OP_EnvAtk; break;
+				case UI_OF_EnvDec: help_index = UIH_OP_EnvDec; break;
+				case UI_OF_EnvSus: help_index = UIH_OP_EnvSus; break;
+				case UI_OF_EnvRel: help_index = UIH_OP_EnvRel; break;
+				case UI_OF_EnvScale: help_index = UIH_OP_EnvScale; break;
+				case UI_OF_SoundWave: help_index = UIH_OP_SoundWave; break;
+				case UI_OF_SoundDrum: help_index = UIH_OP_SoundDrum; break;
+				case UI_OF_FxTrm: help_index = UIH_OP_FxTrm; break;
+				case UI_OF_FxVib: help_index = UIH_OP_FxVib; break;
+				case UI_OF_FreqMode: help_index = UIH_OP_FreqMode; break;
+				case UI_OF_FreqBlock: help_index = UIH_OP_FreqBlock; break;
+				case UI_OF_FreqMult: help_index = UIH_OP_FreqMult; break;
+				case UI_OF_FreqNum: help_index = UIH_OP_FreqNum; break;
+			}
+			break;
+	}
+
+	_settextwindow(41, 6, 46, 74);
+
+	if (help_index != last_help_index) {
+		_clearscreen(_GWINDOW);
+		if (help_index >= 0 && help_index < UIH_LAST) {
+			_outtext(HELPSTRINGS[help_index]);
+			last_help_index = help_index;
+		}
 	}
 
 	_settextwindow(1, 1, 50, 80);
 }
 
-static void draw_op_field(const ESFM_Channel *channel, int op, enum UI_OpFields field)
+static void draw_channel_select_row(const ESFM_Channel *channel, int is_selected)
+{
+	char buf[81];
+
+	// Line 1: "Channel X"
+	_settextposition(3, 3);
+	sprintf(buf, "Channel %-2d", channel->channel + 1);
+	if (is_selected) {
+		setcolors(UI_C_SelectedField);
+	} else {
+		setcolors(UI_C_Default);
+	}
+	_outtext(buf);
+}
+
+static void draw_op_headers(void)
+{
+	setcolors(UI_C_Header);
+	_settextposition(4, 4);
+	_outtext("Out             Mod  Envelope              Sound    Fx   Frequency         ");
+	_settextposition(5, 4);
+	_outtext("LR Lev Attn Sc  Lev  M Atk Dec Sus Rel Sc  Wav Drm  T V  Mode Blk Mul FrNum");
+}
+
+
+static void draw_op_field_sel(const ESFM_Channel *channel, int op, enum UI_OpFields field, int is_selected)
 {
 	static short field_positions[UI_OF_LAST][2] = {
 		// First and last position (inclusive) each field is printed on
@@ -127,7 +204,6 @@ static void draw_op_field(const ESFM_Channel *channel, int op, enum UI_OpFields 
 	short pos1 = field_positions[field][0] + 3;
 	short pos2 = field_positions[field][1] + 3 + 1;
 	int is_default = 0;
-	int is_selected = (current_selection.row == (UI_SR_Op1 + op)) && (current_selection.op_field == field);
 	char buf[10] = "";
 
 	// Format the field
@@ -165,7 +241,7 @@ static void draw_op_field(const ESFM_Channel *channel, int op, enum UI_OpFields 
 		itoa(channel->op[op].decay, buf, 10);
 		is_default = channel->op[op].decay == 0;
 		break;
-	case UI_OF_Env_Sus:
+	case UI_OF_EnvSus:
 		itoa(channel->op[op].sustain, buf, 10);
 		is_default = channel->op[op].sustain == 0;
 		break;
@@ -230,41 +306,34 @@ static void draw_op_field(const ESFM_Channel *channel, int op, enum UI_OpFields 
 	while (pos1++ < pos2) _outtext(" ");
 }
 
-static void draw_op_params(const ESFM_Channel *channel)
+static inline void draw_op_field(const ESFM_Channel *channel, int op, enum UI_OpFields field)
+{
+	draw_op_field_sel(channel, op, field, (current_selection.row == (UI_SR_Op1 + op)) && (current_selection.op_field == field));
+}
+
+static void draw_op_row(const ESFM_Channel *channel, int op)
 {
 	char buf[81];
-	int op, field;
-	memset(buf, 0, sizeof(buf));
-
-	// Line 1: "Channel X"
-	_settextposition(3, 3);
-	sprintf(buf, "Channel %-2d", channel->channel + 1);
-	if (current_selection.row == UI_SR_Channel) {
-		setcolors(UI_C_SelectedField);
-	} else {
-		setcolors(UI_C_Default);
-	}
-	_outtext(buf);
-
-	// Line 2-3: Headers
+	int field;
+	
+	// Blank out the line
+	_settextposition(6 + op, 1);
 	setcolors(UI_C_Header);
-	_settextposition(4, 4);
-	_outtext("Out             Mod  Envelope              Sound    Fx   Frequency         ");
-	_settextposition(5, 4);
-	_outtext("LR Lev Attn Sc  Lev  M Atk Dec Sus Rel Sc  Wav Drm  T V  Mode Blk Mul FrNum");
-
-	// Line 4-7: Operators
-	for (op = 0; op < 4; ++op) {
-		// Blank out the line
-		_settextposition(6 + op, 1);
-		setcolors(UI_C_Header);
-		sprintf(buf, " %d                                                                            ", op + 1);
-		_outtext(buf);
-		// Draw the parameters
-		for (field = UI_OF_OutL; field < UI_OF_LAST; ++field) {
-			draw_op_field(channel, op, field);
-		}
+	sprintf(buf, " %d                                                                            ", op + 1);
+	_outtext(buf);
+	// Draw the parameters
+	for (field = UI_OF_OutL; field < UI_OF_LAST; ++field) {
+		draw_op_field(channel, op, field);
 	}
+}
+
+static void draw_op_params(const ESFM_Channel *channel)
+{
+	int op;
+	
+	draw_channel_select_row(channel, current_selection.row == UI_SR_Channel);
+	draw_op_headers();
+	for (op = 0; op < 4; ++op) draw_op_row(channel, op);
 }
 
 static short orgvideomode;
@@ -289,6 +358,9 @@ int ui_init(void)
 	_setbkcolor(_WHITE);
 	_settextcolor(_BLACK);
 	_clearscreen(_GCLEARSCREEN);
+	_displaycursor(_GCURSOROFF);
+
+	memset(&current_selection, 0, sizeof(current_selection));
 	
 	return 1;
 }
@@ -364,16 +436,19 @@ static void move_row(int delta)
 
 	// redraw
 	if (old_row >= UI_SR_Op1 && old_row <= UI_SR_Op4) {
-		draw_op_field(cur_channel, old_row - UI_SR_Op1, current_selection.op_field);
+		draw_op_field_sel(cur_channel, old_row - UI_SR_Op1, current_selection.op_field, 0);
 		++drawn;
 	}
 	if (new_row >= UI_SR_Op1 && new_row <= UI_SR_Op4) {
-		draw_op_field(cur_channel, new_row - UI_SR_Op1, current_selection.op_field);
+		draw_op_field_sel(cur_channel, new_row - UI_SR_Op1, current_selection.op_field, 1);
 		++drawn;
 	}
 	if (drawn != 2) {
+		// TODO: be more efficient
 		draw_op_params(cur_channel);
 	}
+
+	draw_help(0);
 }
 
 static void move_col(int delta)
@@ -393,13 +468,26 @@ static void move_col(int delta)
 			if (new_col >= UI_OF_LAST) new_col = 0;
 			current_selection.op_field = new_col;
 			// redraw
-			draw_op_field(cur_channel, current_selection.row - UI_SR_Op1, old_col);
-			draw_op_field(cur_channel, current_selection.row - UI_SR_Op1, new_col);
+			draw_op_field_sel(cur_channel, current_selection.row - UI_SR_Op1, old_col, 0);
+			draw_op_field_sel(cur_channel, current_selection.row - UI_SR_Op1, new_col, 1);
+			break;
+		case UI_SR_ChanMenu:
+			// keep previous for redraw
+			old_col = current_selection.chan_menu_item;
+			// calculate new value
+			new_col = old_col + delta;
+			if (new_col < 0) new_col = 0;
+			if (new_col > 3) new_col = 3;
+			current_selection.chan_menu_item = new_col;
+			// redraw
+			// TODO
 			break;
 		default:
 			// Nothing to change here
 			break;
 	}
+
+	draw_help(0);
 }
 
 static inline int clamp(int val, int min, int max)
@@ -454,7 +542,7 @@ static int change_op_param(int delta, int opnum)
 			new_val = clamp(old_val + delta, 0, 15);
 			if (old_val != new_val) op->decay = new_val;
 			return old_val != new_val;
-		case UI_OF_Env_Sus:
+		case UI_OF_EnvSus:
 			old_val = op->sustain;
 			new_val = clamp(old_val + delta, 0, 15);
 			if (old_val != new_val) op->sustain = new_val;
@@ -523,7 +611,7 @@ static int change_param(int delta)
 		case UI_SR_Op3:
 		case UI_SR_Op4:
 			if (change_op_param(delta, current_selection.row - UI_SR_Op1)) {
-				draw_op_field(cur_channel, current_selection.row - UI_SR_Op1, current_selection.op_field);
+				draw_op_field_sel(cur_channel, current_selection.row - UI_SR_Op1, current_selection.op_field, 1);
 				return 1;
 			} else {
 				return 0;
