@@ -1,146 +1,115 @@
 #include <stdio.h>
+#include <string.h>
 #include <dos.h>
 #include <bios.h>
 #include <mem.h>
 
 #include "esfm.h"
 
-int FMBASE = 0x388;
+/* channel we're playing on */
+static ESFM_Channel channel;
 
-/*
- * Frequency numbers.
- * Index 0 and 13 are for modulation effect base,
- * the range of values for lookup are index 1 to 12, inclusive.
- */
-unsigned FNUM_BASE[14] = {
-	326, // B
-	345, // C
-	365, // C#
-	387, // D
-	410, // D#
-	435, // E
-	460, // F
-	488, // F#
-	517, // G
-	547, // G#
-	580, // A
-	614, // A#
-	651, // B
-	690, // C
-};
+/* current input and run state */
+static int run = 1;
 
-unsigned FBLOCK_FMULT_OCTAVE[9][2] = {
-	{ 1, 1 },
-	{ 2, 1 },
-	{ 2, 2 },
-	{ 2, 4 },
-	{ 3, 4 },
-	{ 4, 4 },
-	{ 5, 4 },
-	{ 6, 4 },
-	{ 7, 4 },
-};
+static int editregnum = 0;
+static int editmode = 0;
+static int editop = 0;
 
-unsigned int fm_regbase(int chan, int op)
+void print_status_line(void)
 {
-	return (chan << 5) + (op << 3);
-}
+	char playstatus[6];
+	const char *editmodestr;
+	const char *editregnamestr;
+	char regvalstr[8];
+	int regval, regvalmax;
 
-void fm_write(unsigned int reg, unsigned char d)
-{
-	outportb(FMBASE + 2, reg & 0xFF);
-	outportb(FMBASE + 3, reg >> 8);
-	(void)inportb(FMBASE); /* delay */
-	outportb(FMBASE + 1, d);
-}
-
-unsigned char fm_read(unsigned int reg)
-{
-	outportb(FMBASE + 2, reg & 0xFF);
-	outportb(FMBASE + 3, reg >> 8);
-	(void)inportb(FMBASE); /* delay */
-	return inportb(FMBASE + 1);
-}
-
-void fm_noteon(int chan)
-{
-	fm_write(0x240 + chan, 0x01);
-}
-
-void fm_noteoff(int chan)
-{
-	fm_write(0x240 + chan, 0x00);
-}
-
-void fm_init(void)
-{
-	outportb(FMBASE, 0x01);
-	fm_write(0x105, 0x80);
-}
-
-void fm_setop(int chan, int op, ESFM_Operator *params)
-{
-	unsigned int regbase = fm_regbase(chan, op);
-	fm_write(regbase + 0, (params->trm << 7) | (params->vib << 6) | (params->egt << 5) | (params->ksr << 4) | params->fmult);
-	fm_write(regbase + 1, (params->ksl << 3) | params->attenuation);
-	fm_write(regbase + 2, (params->attack << 4) | params->decay);
-	fm_write(regbase + 3, (params->sustain << 4) | params->release);
-	fm_write(regbase + 4, params->fnum & 0xFF);
-	fm_write(regbase + 5, (params->delay << 5) | (params->fblock << 2) | (params->fnum >> 8));
-	fm_write(regbase + 6, (params->trmd << 7) | (params->vibd << 6) | (params->out_right << 5) | (params->out_left << 4) | (params->mod_level << 1) | params->_unk1);
-	fm_write(regbase + 7, (params->out_level << 5) | (params->noise << 3) | params->wave);
-}
-
-void fm_playchan(ESFM_Channel *chan, char octave, char note) {
-	int op;
-	int fblock, fmult, fnum;
-
-	// stop playing
-	if (chan->playing) {
-		fm_noteoff(chan->channel);
-		//delay(2);
-		chan->playing = 0;
+	if (channel.playing) {
+		sprintf(playstatus, "%d-%d", channel.octave, channel.note);
+	} else {
+		sprintf(playstatus, " - ");
 	}
 
-	// prepare note
-	chan->octave = octave;
-	chan->note = note;
-	for (op = 0; op < 4; ++op) {
-		if (chan->frule[op].use_note) {
-			fblock = FBLOCK_FMULT_OCTAVE[octave][0] + chan->frule[op].dfblock;
-			fmult = FBLOCK_FMULT_OCTAVE[octave][1] + chan->frule[op].dfmult;
-			fnum = FNUM_BASE[note] + chan->frule[op].dfnum;
-		} else {
-			fblock = chan->frule[op].dfblock;
-			fmult = chan->frule[op].dfmult;
-			fnum = chan->frule[op].dfnum;
-		}
-		if (fblock < 0) fblock = 0;
-		if (fblock > 7) fblock = 7;
-		if (fmult < 0) fmult = 0;
-		if (fmult > 15) fmult = 15;
-		if (fnum < 0) fnum = 0;
-		if (fnum > 1023) fnum = 1023;
-		chan->op[op].fblock = fblock;
-		chan->op[op].fmult = fmult;
-		chan->op[op].fnum = fnum;
-		fm_setop(chan->channel, op, &chan->op[op]);
+	switch (editmode) {
+	case 0:
+		editmodestr = "Param";
+		editregnamestr = fm_regname(editregnum, &regvalmax);
+		regval = fm_getreg(&channel.op[editop], editregnum);
+		break;
+	case 1:
+		editmodestr = "FRule";
+		editregnamestr = fm_frulename(editregnum, NULL, &regvalmax);
+		regval = fm_getfrule(&channel.frule[editop], editregnum);
+		break;
+	default:
+		editmodestr = "?what?";
+		editregnamestr = "reg?";
+		regval = 0;
+		break;
 	}
 
-	// play!
-	fm_noteon(chan->channel);
-	chan->playing = 1;
+	if (regvalmax == 1) {
+		if (regval) strcpy(regvalstr, "ON");
+		else strcpy(regvalstr, "OFF");
+	} else {
+		sprintf(regvalstr, "%d", regval);
+	}
+
+	printf(" %-5s > OP-%d  %6s %2d %-4s = %-5s\r",
+		playstatus,
+		editop + 1,
+		editmodestr,
+		editregnum,
+		editregnamestr,
+		regvalstr
+		);
 }
+
+void regedit_change(int delta)
+{
+	int minval = 0, maxval = 0, curval;
+	switch (editmode) {
+	case 0:
+		fm_regname(editregnum, &maxval);
+		curval = fm_getreg(&channel.op[editop], editregnum);
+		curval += delta;
+		if (curval < minval) curval = minval;
+		if (curval > maxval) curval = maxval;
+		fm_setreg(&channel.op[editop], editregnum, curval);
+		break;
+	case 1:
+		fm_frulename(editregnum, &minval, &maxval);
+		curval = fm_getfrule(&channel.frule[editop], editregnum);
+		curval += delta;
+		if (curval < minval) curval = minval;
+		if (curval > maxval) curval = maxval;
+		fm_setfrule(&channel.frule[editop], editregnum, curval);
+      break;
+	}
+}
+
+
+void help(void)
+{
+	puts("Letters Q-P and Z-M and keys above them play notes. Space stops. ESC exits.");
+	puts("F1-F4 selects an operator to edit.");
+	puts("F5-F6 selects operator parameters to edit.");
+	puts("F7-F8 selects operator f-rule parameters to edit.");
+	puts("F9-F10 changes value of the selected parameter.");
+	puts("Operator parameters are sent to the synth immediately after edit.");
+	puts("Changes to f-rules need a new note trigger to take effect.");
+}
+
 
 int main()
 {
-	int note, lastnote = -1;
+	// input
+	int note = 1;
 	int octave = 3;
-	int run = 1;
-	ESFM_Channel channel;
 
 	memset(&channel, 0, sizeof(channel));
 
+	// Basic simple frequency rule
 	channel.frule[0].use_note = 1;
 	channel.frule[1].use_note = 1;
 	channel.frule[2].use_note = 1;
@@ -169,8 +138,10 @@ int main()
 	channel.op[0].out_right = 1;
 	channel.op[0].out_level = 7;
 
-	printf("Hello world (%u)\n", sizeof(channel));
+	printf("Setting up synth...\n");
 	fm_init();
+	help();
+	print_status_line();
 
 	while (run) {
 		while (bioskey(1) == 0);
@@ -211,39 +182,79 @@ int main()
 			case 0x31: note =  3; octave = 4; break;
 			case 0x24: note =  4; octave = 4; break;
 			case 0x32: note =  5; octave = 4; break;
-			// space
+			// space (stop playing)
 			case 0x39: note = -1; break;
-			// escape
+			// escape (quit)
 			case 0x01: run = 0; note = -1; break;
-			// F1-F8
+			// F1-F4 (select operator to edit)
 			case 0x3B: case 0x3C: case 0x3D: case 0x3E:
-			case 0x3F: case 0x40: case 0x41: case 0x42:
-				channel.op[0].wave = (unsigned)((note >> 8) - 0x3B) & 7;
-				printf("wvf=%d,", channel.op[0].wave);
-				note = -2;
+				editop = (note >> 8) - 0x3B;
+				note = 0;
+				break;
+			// F5-F8 (select parameter to edit)
+			case 0x3F: case 0x40:
+				if (editmode != 0) {
+					editmode = 0;
+					editregnum = 0;
+				} else if ((note >> 8) == 0x3F) {
+					editregnum -= 1;
+					if (editregnum < 0) editregnum = 18;
+				} else {
+					editregnum += 1;
+					if (editregnum > 18) editregnum = 0;
+				}
+				note = 0;
+				break;
+			case 0x41: case 0x42:
+				if (editmode != 1) {
+					editmode = 1;
+					editregnum = 0;
+				} else if ((note >> 8) == 0x41) {
+					editregnum -= 1;
+					if (editregnum < 0) editregnum = 3;
+				} else {
+					editregnum += 1;
+					if (editregnum > 3) editregnum = 0;
+				}
+				note = 0;
+				break;
+			// F9-F10 (edit parameter)
+			case 0x43:
+				regedit_change(-1);
+				note = -3;
+				break;
+			case 0x44:
+				regedit_change(+1);
+				note = -3;
 				break;
 			default:  note = -255; break;
 		}
 
 		if (note > 0) {
-			printf("%01d-%01x,", octave, note);
 			fm_playchan(&channel, octave, note);
 		}
 		if (note == -1) {
 			// sound off
-			printf("*,");
 			fm_noteoff(channel.channel);
+			channel.playing = 0;
 		}
-		if (note == -2 && lastnote > 0) {
+		if (note == -2 && channel.playing) {
 			// sound off after changing parameter
 			fm_noteoff(channel.channel);
+			channel.playing = 0;
+		}
+		if (note == -3) {
+			// parameter change, update
+			fm_setop(channel.channel, editop, &channel.op[editop]);
 		}
 		if (note == -255) {
 			// ignore?
 		}
+
+		print_status_line();
 	}
 
-	puts("*\nGoodbye world\n");
+	puts("\nGoodbye\n");
 
 	return 0;
 }
