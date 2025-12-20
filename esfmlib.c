@@ -28,9 +28,9 @@ unsigned FNUM_BASE[14] = {
 };
 
 unsigned FBLOCK_FMULT_OCTAVE[9][2] = {
-	{ 1, 1 },
-	{ 2, 1 },
-	{ 2, 2 },
+	{ 0, 2 },
+	{ 0, 4 },
+	{ 1, 4 },
 	{ 2, 4 },
 	{ 3, 4 },
 	{ 4, 4 },
