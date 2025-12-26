@@ -47,9 +47,9 @@ typedef struct {
 extern int FMBASE;
 
 /** Base frequency number for notes B-C across one whole octave */
-extern unsigned FNUM_BASE[14];
+extern const unsigned FNUM_BASE[14];
 /** Frequency block and multiplier values for 9 octave range */
-extern unsigned FBLOCK_FMULT_OCTAVE[9][2];
+extern const unsigned FBLOCK_FMULT_OCTAVE[9][2];
 
 /** Initialize ESFM chip */
 void fm_init(void);

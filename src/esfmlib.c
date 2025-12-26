@@ -11,7 +11,7 @@ int FMBASE = 0x388;
  * Index 0 and 13 are for modulation effect base,
  * the range of values for lookup are index 1 to 12, inclusive.
  */
-unsigned FNUM_BASE[14] = {
+const unsigned FNUM_BASE[14] = {
 	326, // B
 	345, // C
 	365, // C#
@@ -28,7 +28,7 @@ unsigned FNUM_BASE[14] = {
 	690, // C
 };
 
-unsigned FBLOCK_FMULT_OCTAVE[9][2] = {
+const unsigned FBLOCK_FMULT_OCTAVE[9][2] = {
 	{ 0, 2 },
 	{ 0, 4 },
 	{ 1, 4 },
