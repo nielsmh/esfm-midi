@@ -68,19 +68,5 @@ void fm_noteoff(int chan);
 /** Start playing a note on an ESFM channel, setting the frequency parameters */
 void fm_playchan(ESFM_Channel *chan, int octave, int note);
 
-/** Get the name and maximum value for an ESFM operator register */
-const char * fm_regname(int regnum, int *maxval);
-/** Get the value of an ESFM operator register */
-int fm_getreg(ESFM_Operator *op, int regnum);
-/** Set the value of an ESFM operator register */
-void fm_setreg(ESFM_Operator *op, int regnum, int val);
-
-/** Get the name and max/min values for an ESFM operator frequency rule */
-const char * fm_frulename(int regnum, int *minval, int *maxval);
-/** Get the value for an ESFM operator frequency rule */
-int fm_getfrule(ESFM_OpFreqRule *rule, int regnum);
-/** Set the value for an ESFM operator frequency rule */
-void fm_setfrule(ESFM_OpFreqRule *rule, int regnum, int val);
-
 
 #endif
