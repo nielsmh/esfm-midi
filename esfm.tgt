@@ -294,8 +294,8 @@ WVList
 0
 75
 MItem
-6
-esfm.c
+10
+src/esfm.c
 76
 WString
 4
@@ -312,8 +312,8 @@ WVList
 0
 79
 MItem
-9
-esfmlib.c
+13
+src/esfmlib.c
 80
 WString
 4
@@ -330,8 +330,8 @@ WVList
 0
 83
 MItem
-10
-helptext.c
+14
+src/helptext.c
 84
 WString
 4
@@ -348,8 +348,8 @@ WVList
 0
 87
 MItem
-5
-tui.c
+9
+src/tui.c
 88
 WString
 4
@@ -384,8 +384,8 @@ WVList
 0
 95
 MItem
-6
-esfm.h
+10
+src/esfm.h
 96
 WString
 3
@@ -402,8 +402,8 @@ WVList
 0
 99
 MItem
-10
-helptext.h
+14
+src/helptext.h
 100
 WString
 3
@@ -420,8 +420,8 @@ WVList
 0
 103
 MItem
-4
-ui.h
+8
+src/ui.h
 104
 WString
 3

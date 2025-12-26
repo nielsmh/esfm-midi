@@ -142,7 +142,7 @@ static void draw_help(int full)
 	if (help_index != last_help_index) {
 		_clearscreen(_GWINDOW);
 		if (help_index >= 0 && help_index < UIH_LAST) {
-			_outtext(HELPSTRINGS[help_index]);
+			_outtext((char*)HELPSTRINGS[help_index]);
 			last_help_index = help_index;
 		}
 	}
