@@ -5,10 +5,10 @@ objects = esfm.obj esfmlib.obj tui.obj helptext.obj
 .c: src/
 
 .c.obj: .AUTODEPEND
-	wcl -c -q $[*
+	wcl $(CFLAGS) -q -c $[*
 
 esfm.exe: $(objects)
-	wcl /l=dos /q -lr -fe=$^. $(objects)
+	wcl -l=dos -q -lr -fe=$^. $(objects)
 
 clean: .SYMBOLIC
 	rm -f *.err
