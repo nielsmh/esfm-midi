@@ -88,7 +88,7 @@ void fm_setop(int chan, int op, ESFM_Operator *params)
 {
 	unsigned int regbase = fm_regbase(chan, op);
 	fm_write(regbase + 0, (params->trm << 7) | (params->vib << 6) | (params->egt << 5) | (params->ksr << 4) | params->fmult);
-	fm_write(regbase + 1, (params->ksl << 3) | params->attenuation);
+	fm_write(regbase + 1, ((params->ksl & 2) << 5) | ((params->ksl & 1) << 7) | params->attenuation); // KSL bits are reversed
 	fm_write(regbase + 2, (params->attack << 4) | params->decay);
 	fm_write(regbase + 3, (params->sustain << 4) | params->release);
 	fm_write(regbase + 4, params->fnum & 0xFF);

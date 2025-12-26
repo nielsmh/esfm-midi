@@ -90,6 +90,7 @@ static void draw_help(int full)
 {
 	static int last_help_index = -1;
 	int help_index = -1;
+	char buf[10];
 	
 	setcolors(UI_C_HelpBox);
 	
@@ -97,7 +98,7 @@ static void draw_help(int full)
 		_settextwindow(40, 4, 49, 76);
 		_clearscreen(_GWINDOW);
 		_settextwindow(47, 6, 48, 74);
-		_outtext("Arrow keys move selected field. PgUp/PgDown change values. Esc quits.\n");
+		_outtext("Arrow keys move selection. PgUp/PgDown change values. Esc quits.\n");
 		_outtext("The main letter and number keys play notes. Spacebar stops playing.");
 	}
 
@@ -136,7 +137,7 @@ static void draw_help(int full)
 			break;
 	}
 
-	_settextwindow(41, 6, 46, 74);
+	_settextwindow(41, 6, 45, 74);
 
 	if (help_index != last_help_index) {
 		_clearscreen(_GWINDOW);
@@ -360,7 +361,9 @@ int ui_init(void)
 	_clearscreen(_GCLEARSCREEN);
 	_displaycursor(_GCURSOROFF);
 
-	memset(&current_selection, 0, sizeof(current_selection));
+	current_selection.row = UI_SR_Op1;
+	current_selection.op_field = UI_OF_OutLevel;
+	current_selection.chan_menu_item = 0;
 	
 	return 1;
 }

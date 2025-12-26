@@ -15,106 +15,13 @@ ESFM_Channel all_channels[16];
 /* channel we're playing on */
 ESFM_Channel *cur_channel = &all_channels[0];
 
-/* current input and run state */
-static int run = 1;
-
-static int editregnum = 0;
-static int editmode = 0;
-static int editop = 0;
-
-void print_status_line(void)
-{
-	char playstatus[6];
-	const char *editmodestr;
-	const char *editregnamestr;
-	char regvalstr[8];
-	int regval, regvalmax;
-
-	if (cur_channel->playing) {
-		sprintf(playstatus, "%d-%d", cur_channel->octave, cur_channel->note);
-	} else {
-		sprintf(playstatus, " - ");
-	}
-
-	switch (editmode) {
-	case 0:
-		editmodestr = "Param";
-		editregnamestr = fm_regname(editregnum, &regvalmax);
-		regval = fm_getreg(&cur_channel->op[editop], editregnum);
-		break;
-	case 1:
-		editmodestr = "FRule";
-		editregnamestr = fm_frulename(editregnum, NULL, &regvalmax);
-		regval = fm_getfrule(&cur_channel->frule[editop], editregnum);
-		break;
-	default:
-		editmodestr = "?what?";
-		editregnamestr = "reg?";
-		regval = 0;
-		break;
-	}
-
-	if (regvalmax == 1) {
-		if (regval) strcpy(regvalstr, "ON");
-		else strcpy(regvalstr, "OFF");
-	} else {
-		sprintf(regvalstr, "%d", regval);
-	}
-
-	printf(" %-5s > OP-%d  %6s %2d %-4s = %-5s\r",
-		playstatus,
-		editop + 1,
-		editmodestr,
-		editregnum,
-		editregnamestr,
-		regvalstr
-		);
-	fflush(stdout);
-}
-
-void regedit_change(int delta)
-{
-	int minval = 0, maxval = 0, curval;
-	switch (editmode) {
-	case 0:
-		fm_regname(editregnum, &maxval);
-		curval = fm_getreg(&cur_channel->op[editop], editregnum);
-		curval += delta;
-		if (curval < minval) curval = minval;
-		if (curval > maxval) curval = maxval;
-		fm_setreg(&cur_channel->op[editop], editregnum, curval);
-		break;
-	case 1:
-		fm_frulename(editregnum, &minval, &maxval);
-		curval = fm_getfrule(&cur_channel->frule[editop], editregnum);
-		curval += delta;
-		if (curval < minval) curval = minval;
-		if (curval > maxval) curval = maxval;
-		fm_setfrule(&cur_channel->frule[editop], editregnum, curval);
-		break;
-	}
-}
-
-
-void help(void)
-{
-	puts("Letters Q-P and Z-M and keys above them play notes. Space stops. ESC exits.");
-	puts("F1-F4 selects an operator to edit.");
-	puts("F5-F6 selects operator parameters to edit.");
-	puts("F7-F8 selects operator f-rule parameters to edit.");
-	puts("F9-F10 changes value of the selected parameter.");
-	puts("Operator parameters are sent to the synth immediately after edit.");
-	puts("Changes to f-rules need a new note trigger to take effect.");
-}
-
 
 int main()
 {
 	// input
 	UI_Input ui_input;
-	unsigned short keypress;
-	int note = 1;
-	int octave = 3;
+	/* current input and run state */
+	int run = 1;
 
 	if (!ui_init()) return 1;
 
@@ -167,37 +74,10 @@ int main()
 					cur_channel->playing = 0;
 					break;
 				case UICMD_PARMCHANGE:
-					fm_setop(cur_channel->channel, ui_input.parm1, &cur_channel->op[editop]);
+					fm_setop(cur_channel->channel, ui_input.parm1, &cur_channel->op[ui_input.parm1]);
 					break;
 			}
 		}
-
-	/*
-		keypress = _bios_keybrd(_NKEYBRD_READ);
-		printf("<%04x>", keypress); fflush(stdout);
-		note = 0;
-
-		if (note > 0) {
-			fm_playchan(cur_channel, octave, note);
-		}
-		if (note == -1) {
-			// sound off
-			fm_noteoff(cur_channel->channel);
-			cur_channel->playing = 0;
-		}
-		if (note == -2 && cur_channel->playing) {
-			// sound off after changing parameter
-			fm_noteoff(cur_channel->channel);
-			cur_channel->playing = 0;
-		}
-		if (note == -3) {
-			// parameter change, update
-			fm_setop(cur_channel->channel, editop, &cur_channel->op[editop]);
-		}
-		if (note == -255) {
-			// ignore?
-		}
-	*/
 	}
 
 	ui_finalize();
