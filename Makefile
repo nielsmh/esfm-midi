@@ -1,6 +1,6 @@
 CFLAGS=-w4 -bt=dos -fo=.obj -mc
 
-objects = esfm.obj esfmlib.obj tui.obj helptext.obj
+objects = esfm.obj esfmlib.obj tui.obj helptext.obj midi.obj
 
 .c: src/
 
