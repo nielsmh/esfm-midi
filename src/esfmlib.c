@@ -39,6 +39,8 @@ const unsigned FBLOCK_FMULT_OCTAVE[9][2] = {
 	{ 7, 4 },
 };
 
+static void channel_initdata(void);
+
 unsigned int fm_regbase(int chan, int op)
 {
 	return (chan << 5) + (op << 3);
@@ -81,6 +83,8 @@ void fm_init(void)
 	// Verify
 	status = fm_read(0x505);
 	if (!(status & 0x80)) abort();
+
+    channel_initdata();
 }
 
 void fm_setop(int chan, int op, ESFM_Operator *params)
@@ -135,5 +139,64 @@ void fm_playchan(ESFM_Channel *chan, int octave, int note) {
 	// play!
 	fm_noteon(chan->channel);
 	chan->playing = 1;
+}
+
+
+typedef struct {
+    unsigned char midichannel;
+    unsigned char midinote;
+    unsigned char age;
+} ESFM_ChannelReservation;
+
+static ESFM_ChannelReservation channel_reservations[18];
+
+static void channel_initdata(void)
+{
+    int ch;
+    for (ch = 0; ch < 18; ++ch) {
+        channel_reservations[ch].midichannel = 0xFF;
+        channel_reservations[ch].midinote = 0;
+        channel_reservations[ch].age = 0xFF;
+    }
+}
+
+int channel_select(unsigned char midichannel, unsigned char midinote)
+{
+    int ch, best = 0, bestage = 0;
+    // Select channel with highest age
+    for (ch = 0; ch < 18; ++ch) {
+        if (channel_reservations[ch].midichannel == midichannel && channel_reservations[ch].midinote == midinote) {
+            // Channel is already playing this note, re-use it for a repeat note-on
+            best = ch;
+            break;
+        }
+        if (channel_reservations[ch].age > bestage) {
+            // Channel is older the previous best
+            best = ch;
+            bestage = channel_reservations[ch].age;
+        }
+    }
+    // Now reserve the channel
+    channel_reservations[best].midichannel = midichannel;
+    channel_reservations[best].midinote = midinote;
+    channel_reservations[best].age = 0;
+    // And age up everything
+    for (ch = 0; ch < 18; ++ch) {
+        if (ch != best && channel_reservations[ch].age != 0xFF) channel_reservations[ch].age += 1;
+    }
+    return best;
+}
+
+void channel_free(unsigned char midichannel, unsigned char midinote)
+{
+    int ch;
+    for (ch = 0; ch < 18; ++ch) {
+        if (channel_reservations[ch].midichannel == midichannel && channel_reservations[ch].midinote == midinote) {
+            // Found a channel playing this, release it
+            channel_reservations[ch].midichannel = 0xFF;
+            channel_reservations[ch].midinote = 0;
+            channel_reservations[ch].age = 0xFF;
+        }
+    }
 }
 

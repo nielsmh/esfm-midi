@@ -69,4 +69,10 @@ void fm_noteoff(int chan);
 void fm_playchan(ESFM_Channel *chan, int octave, int note);
 
 
+/** Select a hardware FM channel to play on, and reserve it */
+int channel_select(unsigned char midichannel, unsigned char midinote);
+/** Release a hardware FM channel */
+void channel_free(unsigned char midichannel, unsigned char midinote);
+
+
 #endif
