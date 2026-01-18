@@ -90,7 +90,6 @@ static void draw_help(int full)
 {
 	static int last_help_index = -1;
 	int help_index = -1;
-	char buf[10];
 	
 	setcolors(UI_C_HelpBox);
 	
