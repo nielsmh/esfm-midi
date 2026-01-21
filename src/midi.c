@@ -9,7 +9,7 @@
 /* <http://midi.teragonaudio.com/tech/mpu.htm> */
 
 static unsigned MPU_PORT = 0x330;
-static unsigned MPU_IRQ = 9;
+static unsigned MPU_IRQ = 0x0D;
 
 #define MPU_STATUS_DATA_SET_READY  0x80 /* not ready for read */
 #define MPU_STATUS_DATA_READ_READY 0x40 /* not ready for write */
@@ -129,6 +129,16 @@ int midi_handleinput(MIDI_Input *inputdata)
 {
     int available;
     unsigned char data, channel;
+
+    /* Read until the status port reports nothing to read */
+#if 0
+    while (!mpu_busy_read()) {
+        midi_buffer[midi_buffer_write] = mpu_read();
+        ++midi_buffer_write;
+        if (midi_buffer_write == MIDI_BUFSIZE) midi_buffer_write = 0;
+        ++midi_in_activity;
+    }
+#endif
 
     /* Get amount of data available, and do early return check */
     available = midi_numinput();
